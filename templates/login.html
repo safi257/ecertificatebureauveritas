@@ -1,0 +1,111 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Admin Login — CertVerify</title>
+  <link href="https://fonts.googleapis.com/css2?family=Barlow:wght@400;600;700&family=Barlow+Condensed:wght@700;800&display=swap" rel="stylesheet"/>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      min-height: 100vh;
+      font-family: 'Barlow', sans-serif;
+      background: #0a1628;
+      display: flex; align-items: center; justify-content: center;
+    }
+    .bg {
+      position: fixed; inset: 0; z-index: 0;
+      background: url('/static/bg_industry.webp') center/cover no-repeat;
+      filter: brightness(0.2);
+    }
+    .card {
+      position: relative; z-index: 10;
+      background: rgba(10,22,40,0.9);
+      border: 1px solid rgba(59,158,255,0.2);
+      border-radius: 16px;
+      backdrop-filter: blur(20px);
+      padding: 48px 44px;
+      width: 100%; max-width: 420px;
+      box-shadow: 0 24px 80px rgba(0,0,0,0.6);
+    }
+    .logo {
+      text-align: center; margin-bottom: 32px;
+    }
+    .logo-icon {
+      display: inline-flex; align-items: center; justify-content: center;
+      width: 56px; height: 56px;
+      background: #1e6fbf; border-radius: 12px;
+      font-family: 'Barlow Condensed', sans-serif;
+      font-size: 20px; font-weight: 800; color: #fff;
+      margin-bottom: 12px;
+    }
+    .logo h1 {
+      font-family: 'Barlow Condensed', sans-serif;
+      font-size: 22px; font-weight: 800; letter-spacing: 2px;
+      text-transform: uppercase; color: #fff;
+    }
+    .logo p { font-size: 13px; color: #8fa3bf; margin-top: 4px; }
+
+    .flash { padding: 11px 16px; border-radius: 8px; margin-bottom: 20px;
+      font-size: 13px; }
+    .flash.error { background: rgba(231,76,60,.15); border: 1px solid rgba(231,76,60,.4); color: #e74c3c; }
+
+    label {
+      display: block; font-size: 11px; font-weight: 700;
+      letter-spacing: 1.5px; text-transform: uppercase;
+      color: #8fa3bf; margin-bottom: 8px;
+    }
+    input {
+      width: 100%;
+      background: rgba(255,255,255,.05);
+      border: 1px solid rgba(59,158,255,.18);
+      border-radius: 8px;
+      padding: 13px 16px;
+      color: #fff;
+      font-family: 'Barlow', sans-serif;
+      font-size: 15px;
+      outline: none;
+      transition: border-color .2s;
+      margin-bottom: 20px;
+    }
+    input:focus { border-color: #3b9eff; background: rgba(59,158,255,.06); }
+    input::placeholder { color: rgba(255,255,255,.25); }
+
+    .btn {
+      width: 100%;
+      background: linear-gradient(90deg, #1e6fbf, #3b9eff);
+      color: #fff; border: none; border-radius: 10px;
+      padding: 15px; cursor: pointer;
+      font-family: 'Barlow Condensed', sans-serif;
+      font-size: 18px; font-weight: 700; letter-spacing: 2px;
+      text-transform: uppercase;
+      transition: opacity .2s;
+    }
+    .btn:hover { opacity: .85; }
+  </style>
+</head>
+<body>
+  <div class="bg"></div>
+  <div class="card">
+    <div class="logo">
+      <div class="logo-icon">CV</div>
+      <h1>CertVerify Admin</h1>
+      <p>Sign in to manage certificates</p>
+    </div>
+
+    {% with messages = get_flashed_messages(with_categories=true) %}
+      {% for cat, msg in messages %}
+        <div class="flash {{ cat }}">{{ msg }}</div>
+      {% endfor %}
+    {% endwith %}
+
+    <form method="POST" action="/login">
+      <label>Username</label>
+      <input type="text" name="username" placeholder="admin" required autofocus/>
+      <label>Password</label>
+      <input type="password" name="password" placeholder="••••••••" required/>
+      <button type="submit" class="btn">Sign In</button>
+    </form>
+  </div>
+</body>
+</html>

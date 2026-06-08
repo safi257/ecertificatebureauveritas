@@ -1,0 +1,230 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Dashboard — CertVerify Admin</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com"/>
+  <link href="https://fonts.googleapis.com/css2?family=Barlow:wght@400;500;600;700&family=Barlow+Condensed:wght@600;700;800&display=swap" rel="stylesheet"/>
+  <style>
+    :root {
+      --navy: #0a1628; --blue: #1a3a6e; --accent: #1e6fbf; --bright: #3b9eff;
+      --green: #27ae60; --red: #c0392b; --white: #f4f7fc; --muted: #8fa3bf;
+      --card: rgba(10,22,40,0.82); --border: rgba(59,158,255,0.18);
+    }
+    *, *::before, *::after { box-sizing: border-box; margin:0; padding:0; }
+    body { min-height:100vh; font-family:'Barlow',sans-serif; background:var(--navy); color:var(--white); }
+
+    .bg { position:fixed; inset:0; z-index:0;
+      background:url('/static/bg.png') center/cover no-repeat;
+      filter:brightness(0.18) saturate(0.6); }
+    .bg-overlay { position:fixed; inset:0; z-index:1;
+      background:linear-gradient(160deg,rgba(10,22,40,.6),rgba(26,58,110,.3)); }
+
+    header {
+      position:relative; z-index:10; width:100%;
+      background:linear-gradient(90deg,#0b1e3a,#1a3a6e);
+      border-bottom:2px solid var(--accent);
+      padding:0 40px; display:flex; align-items:center;
+      justify-content:space-between; height:64px;
+    }
+    .logo { display:flex; align-items:center; gap:14px; }
+    .logo-icon { width:38px;height:38px;background:var(--accent);border-radius:8px;
+      display:flex;align-items:center;justify-content:center;
+      font-family:'Barlow Condensed',sans-serif;font-size:15px;font-weight:800;letter-spacing:1px;color:#fff; }
+    .logo-text { font-family:'Barlow Condensed',sans-serif;font-size:20px;font-weight:700;letter-spacing:2px;text-transform:uppercase;color:#fff; }
+    .logo-text span { color:var(--bright); }
+    .nav-links { display:flex;gap:24px; }
+    .nav-links a { color:var(--muted);text-decoration:none;font-size:13px;font-weight:600;letter-spacing:1px;text-transform:uppercase;
+      padding:6px 0;border-bottom:2px solid transparent;transition:all .2s; }
+    .nav-links a:hover,.nav-links a.active { color:var(--bright);border-color:var(--bright); }
+
+    main { position:relative;z-index:10;width:100%;max-width:1100px;
+      margin:0 auto;padding:44px 20px 80px; }
+
+    .page-title { font-family:'Barlow Condensed',sans-serif;font-size:34px;font-weight:800;
+      letter-spacing:3px;text-transform:uppercase;margin-bottom:4px; }
+    .page-title span { color:var(--bright); }
+    .page-sub { color:var(--muted);font-size:14px;margin-bottom:36px; }
+
+    .flash { padding:12px 18px;border-radius:8px;margin-bottom:20px;font-size:14px; }
+    .flash.error { background:rgba(231,76,60,.15);border:1px solid rgba(231,76,60,.4);color:#e74c3c; }
+    .flash.success { background:rgba(39,174,96,.15);border:1px solid rgba(39,174,96,.4);color:#2ecc71; }
+
+    /* STATS */
+    .stats { display:grid;grid-template-columns:repeat(3,1fr);gap:18px;margin-bottom:36px; }
+    .stat-card { background:var(--card);border:1px solid var(--border);border-radius:14px;
+      backdrop-filter:blur(16px);padding:22px 26px; }
+    .stat-label { font-size:11px;font-weight:700;letter-spacing:1.5px;text-transform:uppercase;color:var(--muted);margin-bottom:8px; }
+    .stat-val { font-family:'Barlow Condensed',sans-serif;font-size:36px;font-weight:800; }
+    .stat-val.green { color:#2ecc71; }
+    .stat-val.red   { color:#e74c3c; }
+    .stat-val.blue  { color:var(--bright); }
+
+    /* SEARCH */
+    .search-bar { position:relative;margin-bottom:20px; }
+    .search-bar input {
+      width:100%;background:var(--card);border:1px solid var(--border);
+      border-radius:10px;padding:13px 18px 13px 46px;
+      color:#fff;font-family:'Barlow',sans-serif;font-size:15px;outline:none;
+      transition:border-color .2s;backdrop-filter:blur(16px);
+    }
+    .search-bar input:focus { border-color:var(--bright); }
+    .search-icon { position:absolute;left:14px;top:50%;transform:translateY(-50%);
+      color:var(--muted);width:18px;height:18px; }
+
+    /* TABLE */
+    .table-wrap { background:var(--card);border:1px solid var(--border);
+      border-radius:14px;overflow:hidden;backdrop-filter:blur(16px); }
+    table { width:100%;border-collapse:collapse; }
+    thead { background:rgba(26,58,110,.5); }
+    thead th { padding:13px 18px;font-size:11px;font-weight:700;letter-spacing:1.5px;
+      text-transform:uppercase;color:var(--muted);text-align:left; }
+    tbody tr { border-bottom:1px solid var(--border);transition:background .15s; }
+    tbody tr:last-child { border-bottom:none; }
+    tbody tr:hover { background:rgba(59,158,255,.05); }
+    tbody td { padding:14px 18px;font-size:14px;color:var(--white); }
+    .td-mono { font-family:'Courier New',monospace;font-size:12px;color:var(--muted); }
+
+    .badge {
+      display:inline-block;padding:3px 10px;border-radius:20px;
+      font-size:11px;font-weight:700;letter-spacing:1px;text-transform:uppercase;
+    }
+    .badge.valid   { background:rgba(39,174,96,.15);color:#2ecc71;border:1px solid rgba(39,174,96,.3); }
+    .badge.expired { background:rgba(192,57,43,.15);color:#e74c3c;border:1px solid rgba(192,57,43,.3); }
+
+    .actions { display:flex;gap:8px; }
+    .btn-view,.btn-copy,.btn-del {
+      border:none;border-radius:6px;padding:6px 14px;
+      font-size:12px;font-weight:600;cursor:pointer;transition:opacity .15s;
+      text-decoration:none;display:inline-flex;align-items:center;gap:5px;
+    }
+    .btn-view { background:rgba(59,158,255,.15);color:var(--bright);border:1px solid rgba(59,158,255,.25); }
+    .btn-copy { background:rgba(39,174,96,.12);color:#2ecc71;border:1px solid rgba(39,174,96,.25); }
+    .btn-del  { background:rgba(192,57,43,.12);color:#e74c3c;border:1px solid rgba(192,57,43,.25); }
+    .btn-view:hover,.btn-copy:hover,.btn-del:hover { opacity:.75; }
+
+    .empty-state { text-align:center;padding:60px 20px;color:var(--muted); }
+    .empty-state .icon { font-size:44px;margin-bottom:14px; }
+
+    @media(max-width:700px){
+      header{padding:0 16px;} .stats{grid-template-columns:1fr 1fr;} thead th:nth-child(4),tbody td:nth-child(4){display:none;}
+    }
+  </style>
+</head>
+<body>
+  <div class="bg"></div>
+  <div class="bg-overlay"></div>
+
+  <header>
+    <div class="logo">
+      <div class="logo-icon">CV</div>
+      <div class="logo-text">Cert<span>Verify</span></div>
+    </div>
+    <nav class="nav-links">
+      <a href="/admin">Issue</a>
+      <a href="/dashboard" class="active">Dashboard</a>
+    </nav>
+  </header>
+
+  <main>
+    <div class="page-title">Certificate <span>Dashboard</span></div>
+    <div class="page-sub">Manage and monitor all issued certificates.</div>
+
+    {% with messages = get_flashed_messages(with_categories=true) %}
+      {% for cat, msg in messages %}
+        <div class="flash {{ cat }}">{{ msg }}</div>
+      {% endfor %}
+    {% endwith %}
+
+    <!-- STATS -->
+    {% set valid_count = certs | selectattr('status','equalto','VALID') | list | length %}
+    {% set expired_count = certs | selectattr('status','equalto','EXPIRED') | list | length %}
+    <div class="stats">
+      <div class="stat-card">
+        <div class="stat-label">Total Issued</div>
+        <div class="stat-val blue">{{ certs | length }}</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-label">Active / Valid</div>
+        <div class="stat-val green">{{ valid_count }}</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-label">Expired</div>
+        <div class="stat-val red">{{ expired_count }}</div>
+      </div>
+    </div>
+
+    <!-- SEARCH -->
+    <div class="search-bar">
+      <svg class="search-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+        <circle cx="11" cy="11" r="8"/><path d="M21 21l-4.35-4.35"/>
+      </svg>
+      <input type="text" id="searchInput" placeholder="Search by name, company, type, location…"/>
+    </div>
+
+    <!-- TABLE -->
+    <div class="table-wrap">
+      {% if certs %}
+      <table id="certTable">
+        <thead>
+          <tr>
+            <th>Name</th>
+            <th>Company</th>
+            <th>Type</th>
+            <th>Issued</th>
+            <th>Expiry</th>
+            <th>Status</th>
+            <th>Actions</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for c in certs %}
+          <tr data-search="{{ c.person_name }} {{ c.company_name }} {{ c.certificate_type }} {{ c.training_location }}">
+            <td><strong>{{ c.person_name }}</strong></td>
+            <td>{{ c.company_name }}</td>
+            <td style="max-width:180px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;" title="{{ c.certificate_type }}">{{ c.certificate_type }}</td>
+            <td>{{ c.issued_on }}</td>
+            <td>{{ c.valid_until }}</td>
+            <td><span class="badge {{ c.status | lower }}">{{ c.status }}</span></td>
+            <td>
+              <div class="actions">
+                <a class="btn-view" href="/certificate/{{ c.uuid }}" target="_blank">View</a>
+                <button class="btn-copy" onclick="copyLink('{{ request.host_url }}certificate/{{ c.uuid }}')">Copy Link</button>
+                <form method="POST" action="/dashboard/delete/{{ c.uuid }}" style="display:inline" onsubmit="return confirm('Delete this certificate?')">
+                  <button type="submit" class="btn-del">Delete</button>
+                </form>
+              </div>
+            </td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+      {% else %}
+      <div class="empty-state">
+        <div class="icon">📋</div>
+        <p>No certificates issued yet. <a href="/admin" style="color:var(--bright)">Issue the first one →</a></p>
+      </div>
+      {% endif %}
+    </div>
+  </main>
+
+  <script>
+    document.getElementById('searchInput')?.addEventListener('input', function() {
+      const q = this.value.toLowerCase();
+      document.querySelectorAll('#certTable tbody tr').forEach(tr => {
+        tr.style.display = tr.dataset.search.toLowerCase().includes(q) ? '' : 'none';
+      });
+    });
+
+    function copyLink(url) {
+      navigator.clipboard.writeText(url).then(() => {
+        const b = event.target;
+        const orig = b.textContent;
+        b.textContent = 'Copied!';
+        setTimeout(() => b.textContent = orig, 1800);
+      });
+    }
+  </script>
+</body>
+</html>
