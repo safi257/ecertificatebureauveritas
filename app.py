@@ -1,53 +1,121 @@
 from flask import Flask, render_template, request, redirect, url_for, jsonify, flash, session
-import sqlite3
-import uuid
-from datetime import datetime, date
 import os
+from datetime import datetime, date
+import uuid
 
 app = Flask(__name__)
 app.secret_key = os.environ.get('SECRET_KEY', 'certsys-secret-2026-xK9mP3qL')
 
-DB_PATH = os.environ.get('DB_PATH', 'certificates.db')
-
-# ── ADMIN CREDENTIALS ──
 ADMIN_USERNAME = os.environ.get('ADMIN_USERNAME', 'admin')
 ADMIN_PASSWORD = os.environ.get('ADMIN_PASSWORD', 'CertAdmin2026!')
 
+DATABASE_URL = os.environ.get('DATABASE_URL', '')
+
+# ── DB ABSTRACTION ───────────────────────────────────
+# Uses PostgreSQL if DATABASE_URL is set, otherwise SQLite
+
 def get_db():
-    conn = sqlite3.connect(DB_PATH)
-    conn.row_factory = sqlite3.Row
-    return conn
+    if DATABASE_URL:
+        import psycopg2
+        import psycopg2.extras
+        conn = psycopg2.connect(DATABASE_URL)
+        return conn, 'pg'
+    else:
+        import sqlite3
+        conn = sqlite3.connect('certificates.db')
+        conn.row_factory = sqlite3.Row
+        return conn, 'sqlite'
 
 def init_db():
-    conn = get_db()
-    conn.execute("""
-        CREATE TABLE IF NOT EXISTS certificates (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
-            uuid TEXT UNIQUE NOT NULL,
-            deliverable_id TEXT NOT NULL,
-            id_barcode TEXT NOT NULL,
-            company_name TEXT NOT NULL,
-            person_name TEXT NOT NULL,
-            certificate_type TEXT NOT NULL,
-            model TEXT NOT NULL,
-            issued_on TEXT NOT NULL,
-            valid_until TEXT NOT NULL,
-            training_location TEXT NOT NULL,
-            trainer TEXT NOT NULL,
-            created_at TEXT DEFAULT CURRENT_TIMESTAMP
-        )
-    """)
-    # Migrate existing DB: add new columns if missing
-    existing = [row[1] for row in conn.execute("PRAGMA table_info(certificates)").fetchall()]
-    for col, default in [
-        ('deliverable_id', "''"),
-        ('id_barcode', "''"),
-        ('model', "'N/A'"),
-    ]:
-        if col not in existing:
-            conn.execute(f"ALTER TABLE certificates ADD COLUMN {col} TEXT NOT NULL DEFAULT {default}")
+    conn, db_type = get_db()
+    cur = conn.cursor()
+    if db_type == 'pg':
+        cur.execute("""
+            CREATE TABLE IF NOT EXISTS certificates (
+                id SERIAL PRIMARY KEY,
+                uuid TEXT UNIQUE NOT NULL,
+                deliverable_id TEXT NOT NULL,
+                id_barcode TEXT NOT NULL,
+                company_name TEXT NOT NULL,
+                person_name TEXT NOT NULL,
+                certificate_type TEXT NOT NULL,
+                model TEXT NOT NULL,
+                issued_on TEXT NOT NULL,
+                valid_until TEXT NOT NULL,
+                training_location TEXT NOT NULL,
+                trainer TEXT NOT NULL,
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+            )
+        """)
+    else:
+        cur.execute("""
+            CREATE TABLE IF NOT EXISTS certificates (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                uuid TEXT UNIQUE NOT NULL,
+                deliverable_id TEXT NOT NULL,
+                id_barcode TEXT NOT NULL,
+                company_name TEXT NOT NULL,
+                person_name TEXT NOT NULL,
+                certificate_type TEXT NOT NULL,
+                model TEXT NOT NULL,
+                issued_on TEXT NOT NULL,
+                valid_until TEXT NOT NULL,
+                training_location TEXT NOT NULL,
+                trainer TEXT NOT NULL,
+                created_at TEXT DEFAULT CURRENT_TIMESTAMP
+            )
+        """)
+        # migrate old db
+        existing = [row[1] for row in cur.execute("PRAGMA table_info(certificates)").fetchall()]
+        for col, default in [('deliverable_id',"''"),('id_barcode',"''"),('model',"'N/A'")]:
+            if col not in existing:
+                cur.execute(f"ALTER TABLE certificates ADD COLUMN {col} TEXT NOT NULL DEFAULT {default}")
     conn.commit()
     conn.close()
+
+def rows_to_dicts(rows, db_type):
+    if db_type == 'pg':
+        return [dict(row) for row in rows]
+    else:
+        return [dict(row) for row in rows]
+
+def db_fetchall(query, params=()):
+    conn, db_type = get_db()
+    cur = conn.cursor()
+    if db_type == 'pg':
+        import psycopg2.extras
+        cur = conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor)
+        cur.execute(query.replace('?', '%s'), params)
+    else:
+        cur.execute(query, params)
+    rows = cur.fetchall()
+    conn.close()
+    return [dict(r) for r in rows]
+
+def db_fetchone(query, params=()):
+    conn, db_type = get_db()
+    cur = conn.cursor()
+    if db_type == 'pg':
+        import psycopg2.extras
+        cur = conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor)
+        cur.execute(query.replace('?', '%s'), params)
+    else:
+        cur.execute(query, params)
+    row = cur.fetchone()
+    conn.close()
+    return dict(row) if row else None
+
+def db_execute(query, params=()):
+    conn, db_type = get_db()
+    cur = conn.cursor()
+    if db_type == 'pg':
+        cur.execute(query.replace('?', '%s'), params)
+    else:
+        cur.execute(query, params)
+    conn.commit()
+    conn.close()
+
+# ── HELPERS ──────────────────────────────────────────
 
 def get_status(issued_on_str, valid_until_str):
     try:
@@ -71,7 +139,7 @@ def login_required(f):
         return f(*args, **kwargs)
     return decorated
 
-# ── AUTH ROUTES ─────────────────────────────────────
+# ── AUTH ─────────────────────────────────────────────
 
 @app.route("/login", methods=["GET", "POST"])
 def login():
@@ -89,7 +157,7 @@ def logout():
     session.clear()
     return redirect(url_for('login'))
 
-# ── ADMIN ROUTES (protected) ─────────────────────────
+# ── ADMIN ─────────────────────────────────────────────
 
 @app.route("/")
 @login_required
@@ -117,51 +185,41 @@ def submit():
 
     if not all([deliverable_id, id_barcode, company_name, person_name,
                 certificate_type, issued_on, valid_until, training_location, trainer]):
-        flash("All fields are required — no field may be left empty.", "error")
+        flash("All fields are required.", "error")
         return redirect(url_for('admin_form'))
 
     cert_uuid = str(uuid.uuid4())
-    conn = get_db()
-    conn.execute("""
+    db_execute("""
         INSERT INTO certificates
           (uuid, deliverable_id, id_barcode, company_name, person_name,
            certificate_type, model, issued_on, valid_until, training_location, trainer)
         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     """, (cert_uuid, deliverable_id, id_barcode, company_name, person_name,
           certificate_type, model, issued_on, valid_until, training_location, trainer))
-    conn.commit()
-    conn.close()
     return redirect(url_for('view_certificate', cert_uuid=cert_uuid))
 
 @app.route("/dashboard")
 @login_required
 def dashboard():
-    conn = get_db()
-    certs = conn.execute("SELECT * FROM certificates ORDER BY created_at DESC").fetchall()
-    conn.close()
+    certs = db_fetchall("SELECT * FROM certificates ORDER BY created_at DESC")
     rows = []
     for c in certs:
         status = get_status(c["issued_on"], c["valid_until"])
-        rows.append({**dict(c), "status": status})
+        rows.append({**c, "status": status})
     return render_template("dashboard.html", certs=rows)
 
 @app.route("/dashboard/delete/<cert_uuid>", methods=["POST"])
 @login_required
 def delete_certificate(cert_uuid):
-    conn = get_db()
-    conn.execute("DELETE FROM certificates WHERE uuid = ?", (cert_uuid,))
-    conn.commit()
-    conn.close()
+    db_execute("DELETE FROM certificates WHERE uuid = ?", (cert_uuid,))
     flash("Certificate deleted.", "success")
     return redirect(url_for('dashboard'))
 
-# ── PUBLIC ROUTES (no login needed) ─────────────────
+# ── PUBLIC ────────────────────────────────────────────
 
 @app.route("/certificate/<cert_uuid>")
 def view_certificate(cert_uuid):
-    conn = get_db()
-    cert = conn.execute("SELECT * FROM certificates WHERE uuid = ?", (cert_uuid,)).fetchone()
-    conn.close()
+    cert = db_fetchone("SELECT * FROM certificates WHERE uuid = ?", (cert_uuid,))
     if not cert:
         return render_template("certificate.html", cert=None, status="NOT FOUND")
     status = get_status(cert["issued_on"], cert["valid_until"])
@@ -183,9 +241,7 @@ def view_certificate(cert_uuid):
 
 @app.route("/api/verify/<cert_uuid>")
 def api_verify(cert_uuid):
-    conn = get_db()
-    cert = conn.execute("SELECT * FROM certificates WHERE uuid = ?", (cert_uuid,)).fetchone()
-    conn.close()
+    cert = db_fetchone("SELECT * FROM certificates WHERE uuid = ?", (cert_uuid,))
     if not cert:
         return jsonify({"status": "NOT FOUND"}), 404
     status = get_status(cert["issued_on"], cert["valid_until"])
